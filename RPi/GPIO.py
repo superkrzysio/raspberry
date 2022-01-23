@@ -24,7 +24,10 @@ def setwarnings(flag):
 
 
 def input(port):
-    return 0
+    if ports.get(port) is None:
+        return 0
+    else:
+        return ports[port]
 
 
 def set_mock_input(port, state):

@@ -1,14 +1,17 @@
 import os.path
 import shutil
 
-import RPi.GPIO as GPIO
 import time
 import threading
-import signals
 
-# script for taking photos with Raspberry with a button without preview
-# uses 1 GPIO port for output signal (e.g. buzzer) and 1 for each button
-# remember to power the buzzer through transistor; also see bug note below
+import signals
+import RPi.GPIO as GPIO
+from picamera import PiCamera
+
+# script for taking photos triggered by a signal and without preview
+# can be used for motion-triggered monitoring later, e.g. in car
+
+# uses 1 GPIO port for output signal (e.g. buzzer) and 1 for each sensor (button)
 # Use cases:
 #   - ready to be started during OS boot
 #   - press button1 to make photo in 1st configuration
@@ -17,9 +20,10 @@ import signals
 #   - get vibration/sound confimations of all actions
 
 # PS. strange bug I experienced:
-# after connecting any loose wire to input port, it started blinking/fluctuating on/off - just without a reason
+# after connecting any loose wire to input port, it started blinking/fluctuating on/off at 0.5-2Hz
+#     - as if it were some antenna
 # also happened when I touched the port
-# workaround: ground the port through 680k resistor
+# workaround: ground the port/wire through 680k resistor
 
 
 ### constants
@@ -29,11 +33,10 @@ GOUT = 24
 TARGET = "/home/pi/photos/"
 PENDRIVE = "/usr/media/PENDRIVE/"    # usb storage partition label
 
-# setup
 if not os.path.exists(TARGET):
     os.mkdir(TARGET)
 
-# gpio
+### GPIO setup
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(GIN1, GPIO.IN)
 GPIO.setup(GIN2, GPIO.IN)
@@ -71,12 +74,25 @@ class Button:
         raise Exception("Not set up correctly")
 
 
-def capture_quality():
-    pass
+def capture_quality(camera: PiCamera, stop_condition):
+    camera.iso = 200
+    camera.drc_strength = "low"
+    camera.image_denoise = True
 
+    for i, f in enumerate(camera.capture_continuous('image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}.jpg')):
+        if stop_condition():
+            break
+        onbutton_notification()
 
-def capture_fast():
-    pass
+def capture_fast(camera: PiCamera, stop_condition):
+    camera.iso = 0
+    camera.drc_strength = "off"
+    camera.image_denoise = False
+
+    for i, f in enumerate(camera.capture_continuous('image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}-burst.jpg', burst=True)):
+        if stop_condition():
+            break
+        onbutton_notification()
 
 
 button1 = Button()
@@ -101,7 +117,7 @@ def check_pendrive():
         except:
             signals.alert()
 
-    # dismount everything except /dev/sda - watch out
+    # dismount everything except /dev/sda - watch out in your setup
     drives = [sd for sd in os.listdir("/dev/") if sd.startswith("sd") and sd != "sda"]
     for drive in drives:
         os.system("umount /dev/" + drive)
@@ -110,14 +126,29 @@ def check_pendrive():
 
 # script start
 
-# main polling loop
-while True:
+# testing only
+# def switch_button(butt, delay):
+#     time.sleep(delay)   # delay before button
+#     GPIO.set_mock_input(butt, 1)
+#     time.sleep(2)
+#     GPIO.set_mock_input(butt, 0)
+#
+# th = threading.Thread(target=switch_button, args=(9,4))
+# th.start()
+# th2 = threading.Thread(target=switch_button, args=(10, 8))
+# th2.start()
 
-    for button in buttons:
-        if button.trigger():
-            onbutton_notification()
-            button.action()
+with PiCamera() as cam:
+    # main polling loop
 
-        check_pendrive()
+    signals.welcome()
 
-        time.sleep(0.1)
+    while True:
+        for button in buttons:
+            if button.trigger():
+                onbutton_notification()
+                button.action(cam, lambda: not button.trigger())
+
+            check_pendrive()
+
+            time.sleep(0.1)

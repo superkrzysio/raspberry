@@ -1,2 +1,1 @@
-print("Warning! Using stub version of RPi.GPIO.")
-print("Remove this module if not in development.")
+print("Warning! Using stub version of RPi.GPIO for development. Remove this module on RPi")
