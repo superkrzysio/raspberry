@@ -8,9 +8,11 @@ class Port:
         self.port = port
         self.direction = direction
         self.pull = pull
+        self.default = GPIO.HIGH if pull == GPIO.PUD_UP else GPIO.LOW
 
 
 class Gpio:
+
     def __init__(self):
         GPIO.setmode(GPIO.BCM)
         self.ports = {}
@@ -43,16 +45,21 @@ class Gpio:
 
     # get port state as boolean: False if default value (equal PUD), True when non-default
     def get(self, port):
-        val = GPIO.input(port)
-        return val == GPIO.HIGH and self.ports[port].pull == GPIO.PUD_DOWN or (
-            val == GPIO.LOW and self.ports[port].pull == GPIO.PUD_UP
-        )
+        return GPIO.input(port) != self.ports[port].default
 
     def input(self, port):
         return GPIO.input(port)
 
     def cleanup(self):
         GPIO.cleanup()
+
+    def pwm(self, port, hi_percent, stop_condition, freq=200):
+        while not stop_condition():
+            self.hi(port, 1 / freq * hi_percent / 100)
+            self.lo(port, 1 / freq * (100 - hi_percent) / 100)
+        GPIO.output(port, self.ports[port].default)
+
+    def sound(self, ):
 
     def __initialize_port(self, port: Port):
         if port.direction == GPIO.IN:

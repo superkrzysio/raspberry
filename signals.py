@@ -3,6 +3,8 @@ from threading import Thread
 
 # my library of "signals" - rythms of HIGH signal associated with a name;
 # most useful with vibrating engine or buzzer
+# possible todo: utilize PWM here
+#           it would not guarantee a precise music frequency but at least different tone & fun
 class Signals:
     # a mini pause that separates 2 consecutive HIGH signals, so they are distinguishable
     PAUSE = 0.05
