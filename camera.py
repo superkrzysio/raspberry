@@ -31,7 +31,7 @@ GIN1 = 9
 GIN2 = 10
 GOUT = 24
 TARGET = "/home/pi/photos/"
-PENDRIVE = "/usr/media/PENDRIVE/"    # usb storage partition label
+PENDRIVE = "/media/pi/PENDRIVE/"    # usb storage partition label
 
 if not os.path.exists(TARGET):
     os.mkdir(TARGET)
@@ -79,7 +79,7 @@ def capture_quality(camera: PiCamera, stop_condition):
     camera.drc_strength = "low"
     camera.image_denoise = True
 
-    for i, f in enumerate(camera.capture_continuous('image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}.jpg')):
+    for i, f in enumerate(camera.capture_continuous(TARGET + 'image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}.jpg')):
         if stop_condition():
             break
         onbutton_notification()
@@ -89,7 +89,7 @@ def capture_fast(camera: PiCamera, stop_condition):
     camera.drc_strength = "off"
     camera.image_denoise = False
 
-    for i, f in enumerate(camera.capture_continuous('image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}-burst.jpg', burst=True)):
+    for i, f in enumerate(camera.capture_continuous(TARGET + 'image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}-burst.jpg', burst=True)):
         if stop_condition():
             break
         onbutton_notification()
