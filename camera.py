@@ -147,8 +147,10 @@ with PiCamera() as cam:
         for button in buttons:
             if button.trigger():
                 onbutton_notification()
-                button.action(cam, lambda: not button.trigger())
+                try:
+                    button.action(cam, lambda: not button.trigger())
+                except:
+                    signals.alert()
 
-            check_pendrive()
-
-            time.sleep(0.1)
+        check_pendrive()
+        time.sleep(0.1)
