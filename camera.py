@@ -1,12 +1,10 @@
 import os.path
 import shutil
 import sys
-
 import time
-import threading
 
 import signals
-import RPi.GPIO as GPIO
+from gpio_facade import Gpio
 from picamera import PiCamera
 
 # script for taking photos triggered by a signal and without preview
@@ -22,7 +20,7 @@ from picamera import PiCamera
 #   - graceful shutdown button
 #   - TODO: two-state toggle to switch between photo and video
 
-### constants
+### setup
 G_IN1 = 9
 G_IN2 = 10
 G_POWEROFF = 25
@@ -31,34 +29,19 @@ G_OUT = 24
 TARGET = "/home/pi/photos/"
 PENDRIVE = "/media/pi/PENDRIVE/"    # usb storage partition label
 
+gpio = Gpio()
+gpio.setup_in(G_IN1)
+gpio.setup_in(G_IN2)
+gpio.setup_in(G_POWEROFF)
+gpio.setup_out(G_OUT)
+
+def signal(duration):
+    return gpio.hi(G_OUT, duration)
+
+signals = signals.Signals(signal)
+
 if not os.path.exists(TARGET):
     os.mkdir(TARGET)
-
-### GPIO setup
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(G_IN1, GPIO.IN, pull_up_down=GPIO.PUD_UP)       # button should ground the signal (send LOW)
-GPIO.setup(G_IN2, GPIO.IN, pull_up_down=GPIO.PUD_UP)       #  - no external resistors needed!
-GPIO.setup(G_POWEROFF, GPIO.IN, pull_up_down=GPIO.PUD_UP)  #  - uses slightly less power
-GPIO.setup(G_MODESWITCH, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(G_OUT, GPIO.OUT, initial=GPIO.LOW)
-
-
-def hi(port):
-    GPIO.output(port, GPIO.HIGH)
-
-
-def lo(port):
-    GPIO.output(port, GPIO.LOW)
-
-
-def notification_signal(duration):
-    hi(G_OUT)
-    time.sleep(duration)
-    lo(G_OUT)
-
-
-signals = signals.Signals(notification_signal)
-
 
 class Button:
     def __init__(self):
@@ -92,25 +75,27 @@ def capture_fast(camera: PiCamera, stop_condition):
 
 
 def shutdown(camera: PiCamera, stop_condition):
+    time.sleep(1)       # bad pattern to wait for other threads playing sounds
     signals.bye()
-    GPIO.cleanup()
+    gpio.cleanup()
     os.system("sleep 5 && sudo shutdown -P now &")
     sys.exit(0)
 
 
 button1 = Button()
-button1.trigger = lambda: GPIO.input(G_IN1) == 0
+button1.trigger = lambda: gpio.get(G_IN1)
 button1.action = capture_quality
 
 button2 = Button()
-button2.trigger = lambda: GPIO.input(G_IN2) == 0
+button2.trigger = lambda: gpio.get(G_IN2)
 button2.action = capture_fast
 
 button_off = Button()
-button_off.trigger = lambda: GPIO.input(G_POWEROFF) == 0
+button_off.trigger = lambda: gpio.get(G_POWEROFF)
 button_off.action = shutdown
 
 buttons = [button1, button2, button_off]
+
 
 def check_pendrive():
     if not os.path.exists(PENDRIVE):
@@ -124,10 +109,8 @@ def check_pendrive():
         except:
             signals.alert()
 
-    # dismount everything except /dev/sda - watch out in your setup
-    drives = [sd for sd in os.listdir("/dev/") if sd.startswith("sd") and sd != "sda"]
-    for drive in drives:
-        os.system("umount /dev/" + drive)
+    # /dev/sda is the default and the only device in my setup
+    os.system("umount /dev/sda1")
 
     signals.win()
 

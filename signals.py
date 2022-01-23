@@ -77,7 +77,7 @@ class Signals:
         if asynch:
             self.__call_me_later(self.bye)
             return
-        self.__ring(0.6)
+        self.__ring(1)
         self.__ring(0.2)
         self.__ring(0.2)
 
