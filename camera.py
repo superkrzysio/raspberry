@@ -1,5 +1,6 @@
 import os.path
 import shutil
+import sys
 
 import time
 import threading
@@ -18,18 +19,15 @@ from picamera import PiCamera
 #   - press button2 to make photo in 2nd configuration
 #   - connect USB stick to automatically store all the photos on it, then dismount
 #   - get vibration/sound confimations of all actions
-
-# PS. strange bug I experienced:
-# after connecting any loose wire to input port, it started blinking/fluctuating on/off at 0.5-2Hz
-#     - as if it were some antenna
-# also happened when I touched the port
-# workaround: ground the port/wire through 680k resistor
-
+#   - graceful shutdown button
+#   - TODO: two-state toggle to switch between photo and video
 
 ### constants
-GIN1 = 9
-GIN2 = 10
-GOUT = 24
+G_IN1 = 9
+G_IN2 = 10
+G_POWEROFF = 25
+G_MODESWITCH = 8
+G_OUT = 24
 TARGET = "/home/pi/photos/"
 PENDRIVE = "/media/pi/PENDRIVE/"    # usb storage partition label
 
@@ -38,9 +36,11 @@ if not os.path.exists(TARGET):
 
 ### GPIO setup
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(GIN1, GPIO.IN)
-GPIO.setup(GIN2, GPIO.IN)
-GPIO.setup(GOUT, GPIO.OUT)
+GPIO.setup(G_IN1, GPIO.IN, pull_up_down=GPIO.PUD_UP)       # button should ground the signal (send LOW)
+GPIO.setup(G_IN2, GPIO.IN, pull_up_down=GPIO.PUD_UP)       #  - no external resistors needed!
+GPIO.setup(G_POWEROFF, GPIO.IN, pull_up_down=GPIO.PUD_UP)  #  - uses slightly less power
+GPIO.setup(G_MODESWITCH, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(G_OUT, GPIO.OUT, initial=GPIO.LOW)
 
 
 def hi(port):
@@ -52,9 +52,9 @@ def lo(port):
 
 
 def notification_signal(duration):
-    hi(GOUT)
+    hi(G_OUT)
     time.sleep(duration)
-    lo(GOUT)
+    lo(G_OUT)
 
 
 signals = signals.Signals(notification_signal)
@@ -79,6 +79,7 @@ def capture_quality(camera: PiCamera, stop_condition):
             break
         signals.ping(True)
 
+
 def capture_fast(camera: PiCamera, stop_condition):
     camera.iso = 0
     camera.drc_strength = "off"
@@ -90,15 +91,26 @@ def capture_fast(camera: PiCamera, stop_condition):
         signals.ping(True)
 
 
+def shutdown(camera: PiCamera, stop_condition):
+    signals.bye()
+    GPIO.cleanup()
+    os.system("sleep 5 && sudo shutdown -P now &")
+    sys.exit(0)
+
+
 button1 = Button()
-button1.trigger = lambda: GPIO.input(GIN1)
+button1.trigger = lambda: GPIO.input(G_IN1)
 button1.action = capture_quality
 
 button2 = Button()
-button2.trigger = lambda: GPIO.input(GIN2)
+button2.trigger = lambda: GPIO.input(G_IN2)
 button2.action = capture_fast
 
-buttons = [button1, button2]
+button_off = Button()
+button_off.trigger = lambda: GPIO.input(G_POWEROFF)
+button_off.action = shutdown
+
+buttons = [button1, button2, button_off]
 
 def check_pendrive():
     if not os.path.exists(PENDRIVE):
@@ -119,20 +131,8 @@ def check_pendrive():
 
     signals.win()
 
-# script start
 
-# testing only
-# def switch_button(butt, delay):
-#     time.sleep(delay)   # delay before button
-#     GPIO.set_mock_input(butt, 1)
-#     time.sleep(2)
-#     GPIO.set_mock_input(butt, 0)
-#
-# th = threading.Thread(target=switch_button, args=(9,4))
-# th.start()
-# th2 = threading.Thread(target=switch_button, args=(10, 8))
-# th2.start()
-
+### script start
 with PiCamera() as cam:
     cam.resolution = (2592, 1944)
     signals.welcome()
@@ -148,4 +148,7 @@ with PiCamera() as cam:
                     signals.alert()
 
         check_pendrive()
+
+        # todo: using a toggled switch will require interrupts approach or will much complicate this framework
+        #  also, interrupts save power
         time.sleep(0.1)

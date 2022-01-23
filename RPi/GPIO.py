@@ -4,6 +4,8 @@ IN = 1
 HIGH = 1
 LOW = 0
 BCM = 0
+PUD_UP = 1
+PUD_DOWN = 0
 
 ports = {}
 
@@ -11,7 +13,7 @@ ports = {}
 def setmode(mode):
     pass
 
-def setup(port, direction):
+def setup(port, direction, initial=0, pull_up_down=0):
     ports[port] = 0     # set initial
 
 
@@ -32,3 +34,7 @@ def input(port):
 
 def set_mock_input(port, state):
     ports[port] = state
+
+
+def cleanup():
+    pass
