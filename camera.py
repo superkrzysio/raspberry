@@ -99,15 +99,15 @@ def shutdown(camera: PiCamera, stop_condition):
 
 
 button1 = Button()
-button1.trigger = lambda: GPIO.input(G_IN1)
+button1.trigger = lambda: GPIO.input(G_IN1) == 0
 button1.action = capture_quality
 
 button2 = Button()
-button2.trigger = lambda: GPIO.input(G_IN2)
+button2.trigger = lambda: GPIO.input(G_IN2) == 0
 button2.action = capture_fast
 
 button_off = Button()
-button_off.trigger = lambda: GPIO.input(G_POWEROFF)
+button_off.trigger = lambda: GPIO.input(G_POWEROFF) == 0
 button_off.action = shutdown
 
 buttons = [button1, button2, button_off]
