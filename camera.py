@@ -139,10 +139,10 @@ def check_pendrive():
 # th2.start()
 
 with PiCamera() as cam:
-    # main polling loop
-
+    cam.resolution = (2592, 1944)
     signals.welcome()
 
+    # main polling loop
     while True:
         for button in buttons:
             if button.trigger():
