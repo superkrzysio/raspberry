@@ -60,11 +60,6 @@ def notification_signal(duration):
 signals = signals.Signals(notification_signal)
 
 
-def onbutton_notification():
-    th = threading.Thread(target=signals.ping)
-    th.start()
-
-
 class Button:
     def __init__(self):
         self.trigger = self.must_configure
@@ -82,7 +77,7 @@ def capture_quality(camera: PiCamera, stop_condition):
     for i, f in enumerate(camera.capture_continuous(TARGET + 'image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}.jpg')):
         if stop_condition():
             break
-        onbutton_notification()
+        signals.ping(True)
 
 def capture_fast(camera: PiCamera, stop_condition):
     camera.iso = 0
@@ -92,7 +87,7 @@ def capture_fast(camera: PiCamera, stop_condition):
     for i, f in enumerate(camera.capture_continuous(TARGET + 'image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}-burst.jpg', burst=True)):
         if stop_condition():
             break
-        onbutton_notification()
+        signals.ping(True)
 
 
 button1 = Button()
@@ -146,7 +141,7 @@ with PiCamera() as cam:
     while True:
         for button in buttons:
             if button.trigger():
-                onbutton_notification()
+                signals.ping(True)
                 try:
                     button.action(cam, lambda: not button.trigger())
                 except:
