@@ -2,6 +2,7 @@ import os.path
 import shutil
 import sys
 import time
+from datetime import datetime
 
 import signals
 from gpio_facade import Gpio
@@ -38,7 +39,14 @@ gpio.setup_out(G_OUT)
 def signal(duration):
     return gpio.hi(G_OUT, duration)
 
+
+
 signals = signals.Signals(signal)
+LOG = open(TARGET + datetime.now().strftime("log-%Y.%m.%d-%H.%M.%S.%f.txt"), "w")
+
+def log(txt):
+    LOG.write(datetime.now().strftime("%Y.%m.%d-%H.%M.%S.%f: ") + str(txt) + "\n")
+    LOG.flush()
 
 if not os.path.exists(TARGET):
     os.mkdir(TARGET)
@@ -53,28 +61,36 @@ class Button:
 
 
 def capture_quality(camera: PiCamera, stop_condition):
+    log("Capture mode 1 start")
     camera.iso = 200
     camera.drc_strength = "low"
     camera.image_denoise = True
 
     for i, f in enumerate(camera.capture_continuous(TARGET + 'image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}.jpg')):
+        log("\tCaptured")
         if stop_condition():
             break
         signals.ping(True)
 
+    log("Capture mode 1 stop")
 
 def capture_fast(camera: PiCamera, stop_condition):
+    log("Capture mode 2 start")
     camera.iso = 0
     camera.drc_strength = "off"
     camera.image_denoise = False
 
     for i, f in enumerate(camera.capture_continuous(TARGET + 'image-{timestamp:%Y.%m.%d-%H.%M.%S.%f}-burst.jpg', burst=True)):
+        log("\tCaptured")
         if stop_condition():
             break
         signals.ping(True)
-
+        time.sleep(0.001)
+    log("Capture mode 2 stop")
 
 def shutdown(camera: PiCamera, stop_condition):
+    log("Shutting down gracefully")
+    LOG.close()
     time.sleep(1)       # bad pattern to wait for other threads playing sounds
     signals.bye()
     gpio.cleanup()
@@ -100,18 +116,19 @@ buttons = [button1, button2, button_off]
 def check_pendrive():
     if not os.path.exists(PENDRIVE):
         return
-
+    log("USB stick connected")
     signals.welcome()
 
     for file in os.listdir(TARGET):
         try:
             shutil.move(TARGET + file, PENDRIVE)
-        except:
+        except Exception as e:
+            log("Error during moving files: " + str(e))
             signals.alert()
-
+    log("Files moved")
     # /dev/sda is the default and the only device in my setup
     os.system("umount /dev/sda1")
-
+    log("USB dismounted")
     signals.win()
 
 
@@ -124,10 +141,12 @@ with PiCamera() as cam:
     while True:
         for button in buttons:
             if button.trigger():
+                log("Button triggered: " + str(button.action))
                 signals.ping(True)
                 try:
                     button.action(cam, lambda: not button.trigger())
-                except:
+                except Exception as e:
+                    log("Error during button action: " + str(e))
                     signals.alert()
 
         check_pendrive()
