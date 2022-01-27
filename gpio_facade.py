@@ -8,7 +8,10 @@ class Port:
         self.port = port
         self.direction = direction
         self.pull = pull
-        self.default = initial
+        if direction == GPIO.OUT:
+            self.default = initial
+        elif direction == GPIO.IN:
+            self.default = int(pull == GPIO.PUD_UP)
 
 class Gpio:
 
@@ -84,8 +87,10 @@ class Gpio:
     def __initialize_port(self, port: Port):
         if port.direction == GPIO.IN:
             GPIO.setup(port.port, port.direction, pull_up_down=port.pull)
-        else:
+        elif port.direction == GPIO.OUT:
             GPIO.setup(port.port, port.direction, initial=port.default)
+        else:
+            raise Exception("Incorrect port direction given. Port: {}, direction: {}".format(port.port, port.direction))
 
     class Sound:
         def __init__(self):
