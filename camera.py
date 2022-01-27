@@ -21,11 +21,11 @@ from picamera import PiCamera
 #   - TODO: two-state toggle to switch between photo and video
 
 ### setup
-G_IN1 = 9
-G_IN2 = 10
+G_IN1 = 7
+G_IN2 = 8
 G_POWEROFF = 25
-G_MODESWITCH = 8
-G_OUT = 24
+G_MODESWITCH = None
+G_OUT = 23
 TARGET = "/home/pi/photos/"
 PENDRIVE = "/media/pi/PENDRIVE/"    # usb storage partition label
 
